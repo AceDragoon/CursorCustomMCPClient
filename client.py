@@ -1,3 +1,4 @@
+#client.py
 import asyncio
 from mcp import ClientSession,StdioServerParameters
 from mcp.client.stdio import stdio_client
@@ -21,7 +22,7 @@ async def start_client():
             #listet alle Ressourcen auf
             resources_result = await session.list_resources()
 
-            result = (tools_result,resources_result)
+            result = tools_result.tools
             
     return (result) 
 

@@ -1,42 +1,55 @@
+import os
 import asyncio
-from contextlib import AsyncExitStack
-from typing import Tuple, Dict, Any
-from mcp import ClientSession, StdioServerParameters
-from mcp.client.stdio import stdio_client
+from openai import OpenAI
+from client import start_client
+from dotenv import load_dotenv
 
-class MCPToolClient:
-    def __init__(self, script_path="server.py"):
-        self.script_path = script_path
-        self.session: ClientSession = None
-        self.stack: AsyncExitStack = None
-        self.tools = []
+load_dotenv()
 
-    async def start(self):
-        self.stack = AsyncExitStack()
-        await self.stack.__aenter__()
+# Setze deinen OpenAI-API-Schlüssel
+client_openai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-        params = StdioServerParameters(command="python", args=[self.script_path])
-        read_stream, write_stream = await self.stack.enter_async_context(stdio_client(params))
-        self.session = await self.stack.enter_async_context(ClientSession(read_stream, write_stream))
-        await self.session.initialize()
+messages = [
+    {"role": "system", "content": "Du bist ein hilfreicher, kreativer und freundlicher KI-Assistent."}
+]
 
-        tools_response = await self.session.list_tools()
-        self.tools = tools_response.tools
+async def chat():
+    available_tools = await start_client()
 
-    def get_openai_function_definitions(self):
-        return [
-            {
-                "name": tool.name,
-                "description": tool.description,
-                "parameters": tool.inputSchema
-            }
-            for tool in self.tools
-        ]
+    while True:
+        user_input = input("Du: ")
+        if user_input.lower() in ["exit", "quit"]:
+            print("Beende das Gespräch. Auf Wiedersehen!")
+            break
 
-    async def call_tool(self, name: str, args: Dict[str, Any]) -> str:
-        result = await self.session.call_tool(name, args)
-        return str(result.content)
+        messages.append({"role": "user", "content": user_input})
 
-    async def shutdown(self):
-        if self.stack:
-            await self.stack.aclose()
+        response = client_openai.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=messages,
+            temperature=0.7,
+            functions=[
+                {
+                    "name": tool.name,
+                    "description": tool.description,
+                    "parameters": tool.inputSchema
+                }
+                for tool in available_tools
+            ],
+            function_call="auto",
+            stream=True,
+        )
+
+        print("GPT:", end=" ", flush=True)
+        full_response = ""
+        for chunk in response:
+            if chunk.choices[0].delta.content:
+                content = chunk.choices[0].delta.content
+                print(content, end="", flush=True)
+                full_response += content
+        print()
+
+        messages.append({"role": "assistant", "content": full_response})
+
+if __name__ == "__main__":
+    asyncio.run(chat())
