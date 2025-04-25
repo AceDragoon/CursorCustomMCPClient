@@ -39,3 +39,38 @@ def all_notes() -> str:
     if not notes:
         return "Es sind keine Notizen vorhanden."
 ```
+---
+
+## Neues MCP-Client System
+
+Im Verlauf habe ich einen eigenen Client entwickelt, der mit dem MCP-Server über STDIO kommuniziert und automatisch die verfügbaren Tools lädt.
+
+---
+
+## Funktionen im Client
+
+- **start_client()**  
+  Baut die Verbindung zum Server auf, initialisiert die Session und lädt alle verfügbaren Tools.
+
+- **call_tool(tool_name, args)**  
+  Führt ein vom Server bereitgestelltes Tool mit den passenden Argumenten aus.
+
+- **close_client()**  
+  Beendet die Verbindung am Ende des Programms sauber.
+
+---
+
+## Technologischer Stand
+
+- Tools werden geladen und beschrieben.
+- GPT-3.5 erkennt automatisch, wann ein Tool aufgerufen werden soll.
+- Nach dem Tool-Call wird die Antwort in den Chat eingebaut.
+
+---
+
+## Nächste Schritte
+
+- Ressourcen mit einbinden.
+- Unterstützung für mehrere Server gleichzeitig vorbereiten.
+- Das Hinzufügen von Servern über eine server_config.json.
+- Integration von Ollama.
