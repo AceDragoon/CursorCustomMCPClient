@@ -1,33 +1,48 @@
-#client.py
 import asyncio
-from mcp import ClientSession,StdioServerParameters
+from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
+from contextlib import AsyncExitStack
 
-async def start_client():
-    server_params = StdioServerParameters(
-        command="python",  # The command to run your server
-        args=["server.py"],  # Arguments to the command
-    )
+class MCPClient:
+    def __init__(self):
+        self._session = None
+        self._stack = None
+
+    async def start_client(self):
+        self._stack = AsyncExitStack()
+        await self._stack.__aenter__()
+
+        server_params = StdioServerParameters(
+            command="python",
+            args=["server.py"],
+        )
+        stdio = await self._stack.enter_async_context(stdio_client(server_params))
+        read_stream, write_stream = stdio
+
+        self._session = await self._stack.enter_async_context(ClientSession(read_stream, write_stream))
+        await self._session.initialize()
+
+        tools_result = await self._session.list_tools()
+        return tools_result.tools
+
+    async def call_tool(self, tool_name: str, arguments: dict):
+        if self._session is None:
+            raise Exception("Session wurde noch nicht gestartet! Bitte zuerst start_client() aufrufen.")
+        
+        result = await self._session.call_tool(tool_name, arguments)
+        return result.content
+
+    async def close(self):
+        if self._stack is not None:
+            await self._stack.aclose()
 
 
-    async with stdio_client(server_params) as (read_stream,write_stream):
-        async with ClientSession(read_stream, write_stream) as session:
-            
-            #initialisiert die Session
-            await session.initialize()
-
-            #listet alle tools auf
-            tools_result = await session.list_tools()
-
-            #listet alle Ressourcen auf
-            resources_result = await session.list_resources()
-
-            result = tools_result.tools
-            
-    return (result) 
-
+async def main():
+    client = MCPClient()
+    await client.start_client()
+    output = await client.call_tool("add", {"a": 5, "b": 8})
+    print(output)
+    await client.close()
 
 if __name__ == "__main__":
-    output = asyncio.run(start_client())
-    print(output)
-
+    asyncio.run(main())
