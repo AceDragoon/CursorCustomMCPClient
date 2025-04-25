@@ -29,15 +29,7 @@ async def start_client():
 
 
             # Beispiel: Erste Ressource lesen
-            if resources_result.resources:
-                first_resource_uri = resources_result.resources[0].uri
-                content_result = await session.read_resource(first_resource_uri)
-                for content in content_result.contents:
-                    if content.text:
-                        print(f"\n Inhalt von {content.uri}:\n{content.text}")
-                    elif content.blob:
-                        print(f"\n Binärinhalt von {content.uri} (base64-encoded)")
-            else:
+            if not resources_result.resources:
                 print("Keine Ressourcen verfügbar.")
 
             #result = await session.call_tool("Username", arguments={})
