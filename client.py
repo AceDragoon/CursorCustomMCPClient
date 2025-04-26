@@ -23,7 +23,8 @@ class MCPClient:
         await self._session.initialize()
 
         tools_result = await self._session.list_tools()
-        return tools_result.tools
+        resources_result = await self._session.list_resources()
+        return tools_result.tools, resources_result.resources
 
     async def call_tool(self, tool_name: str, arguments: dict):
         if self._session is None:
@@ -31,6 +32,15 @@ class MCPClient:
         
         result = await self._session.call_tool(tool_name, arguments)
         return result.content
+    
+    async def read_resource(self, uri):
+        if self._session is None:
+            raise Exception("Session wurde noch nicht gestartet! Bitte zuerst start_client() aufrufen.")
+        try:
+            result = await self._session.read_resource(uri)
+        except:
+            return "Error"
+        return result.contents
 
     async def close(self):
         if self._stack is not None:
@@ -39,9 +49,12 @@ class MCPClient:
 
 async def main():
     client = MCPClient()
-    await client.start_client()
-    output = await client.call_tool("add", {"a": 5, "b": 8})
-    print(output)
+    result = await client.start_client()
+    print(result)
+    output_tool = await client.call_tool("add", {"a": 5, "b": 8})
+    print(output_tool)
+    output_resource = await client.read_resource("text://greeting")
+    print(output_resource)
     await client.close()
 
 if __name__ == "__main__":

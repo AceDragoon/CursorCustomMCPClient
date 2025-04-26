@@ -2,26 +2,22 @@ import os
 import asyncio
 import json
 from openai import OpenAI
-from client import MCPClient  # <<< Nur MCPClient importieren
+from client import MCPClient
 from dotenv import load_dotenv
 
 load_dotenv()
 
 client_openai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-messages = [
-    {"role": "system", "content": "Du bist ein hilfreicher, kreativer und freundlicher KI-Assistent."}
-]
-
+messages = [{"role": "system", "content": "Du bist ein hilfreicher KI-Assistent."}]
 async def chat():
-    client = MCPClient()  # <<< MCPClient-Objekt erzeugen
-    available_tools = await client.start_client()
-
+    client = MCPClient()
+    available_tools, resources = await client.start_client()
+    
     try:
         while True:
             user_input = input("Du: ")
             if user_input.lower() in ["exit", "quit"]:
-                print("Beende das Gespräch. Auf Wiedersehen!")
                 break
 
             messages.append({"role": "user", "content": user_input})
@@ -37,6 +33,17 @@ async def chat():
                         "parameters": tool.inputSchema
                     }
                     for tool in available_tools
+                ] + [
+                    {
+                        "name": str(res.uri).replace("://", "_").replace("/", "_"),
+                        "description": res.description,
+                        "parameters": {
+                            "type": "object",
+                            "properties": {},
+                            "required": []
+                        }
+                    }
+                    for res in resources
                 ],
                 function_call="auto",
             )
@@ -45,24 +52,24 @@ async def chat():
 
             if reply.function_call:
                 func_name = reply.function_call.name
-                func_args_json = reply.function_call.arguments
-
                 try:
-                    func_args = json.loads(func_args_json)
+                    func_args = json.loads(reply.function_call.arguments)
                 except json.JSONDecodeError:
                     func_args = {}
+                
+                if func_name.startswith("text://") or func_name.startswith("time://"):
+                    tool_result = await client.read_resource(func_name)
+                else:
+                    tool_result = await client.call_tool(func_name, func_args)
+                print(f"[Tool aufgerufen: {func_name}]") 
 
-                print(f"🛠️ GPT möchte Funktion '{func_name}' aufrufen mit {func_args}")
-
-                # 🔥 Jetzt dein Client-Objekt benutzen!
-                tool_result = await client.call_tool(func_name, func_args)
 
                 messages.append({
                     "role": "assistant",
                     "content": None,
                     "function_call": {
                         "name": func_name,
-                        "arguments": func_args_json
+                        "arguments": reply.function_call.arguments
                     }
                 })
                 messages.append({
@@ -78,14 +85,16 @@ async def chat():
                 )
                 followup_reply = followup_response.choices[0].message
 
-                print(f"\nGPT: {followup_reply.content}")
+                print(f"GPT: {followup_reply.content}")
                 messages.append({"role": "assistant", "content": followup_reply.content})
 
             else:
                 print(f"GPT: {reply.content}")
                 messages.append({"role": "assistant", "content": reply.content})
+
     finally:
         await client.close()
 
 if __name__ == "__main__":
+    print("!")
     asyncio.run(chat())
