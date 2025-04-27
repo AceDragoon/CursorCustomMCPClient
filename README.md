@@ -70,7 +70,8 @@ Im Verlauf habe ich einen eigenen Client entwickelt, der mit dem MCP-Server übe
 
 ## Nächste Schritte
 
-- Ressourcen mit einbinden.
-- Unterstützung für mehrere Server gleichzeitig vorbereiten.
-- Das Hinzufügen von Servern über eine server_config.json.
-- Integration von Ollama.
+- [x] Ressourcen mit einbinden.
+- [ ] Prompts mit einbinden.
+- [ ]  Unterstützung für mehrere Server gleichzeitig vorbereiten.
+- [ ] Das Hinzufügen von Servern über eine server_config.json.
+- [ ] Integration von Ollama.
