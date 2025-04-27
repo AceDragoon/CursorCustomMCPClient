@@ -16,5 +16,20 @@ def current_time() -> str:
     from datetime import datetime
     return datetime.now().isoformat()
 
+@mcp.prompt()
+def simple_greeting(name: str) -> list:
+    """Generiere eine nette Begrüßung für eine Person."""
+    return [
+        {
+            "role": "user",
+            "content": {
+                "type": "text",
+                "text": f"Bitte begrüße höflich {name}."
+            }
+        }
+    ]
+
+
+
 if __name__ == "__main__":
     mcp.run(transport="stdio")

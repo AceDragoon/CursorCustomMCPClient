@@ -12,7 +12,7 @@ client_openai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 messages = [{"role": "system", "content": "Du bist ein hilfreicher KI-Assistent."}]
 async def chat():
     client = MCPClient()
-    available_tools, resources = await client.start_client()
+    available_tools, resources, available_prompts = await client.start_client()
     resource_name_map = {}
 
     for res in resources:
@@ -48,12 +48,28 @@ async def chat():
                         }
                     }
                     for name, uri in resource_name_map.items()
+                ] + [
+                        {
+                            "name": prompt.name,
+                            "description": prompt.description,
+                            "parameters": {
+                                "type": "object",
+                                "properties": {
+                                    arg.name: {
+                                        "type": "string",  # du kannst auf "string" gehen, wenn du nichts anderes weißt
+                                        "description": arg.description or f"{arg.name} (kein Beschreibungstext vorhanden)"
+                                    } for arg in prompt.arguments
+                                },
+                                "required": [arg.name for arg in prompt.arguments if arg.required]
+                            }
+                    }
+                    for prompt in available_prompts
                 ],
                 function_call="auto",
             )
 
             reply = response.choices[0].message
-
+            print(f"Reply: {reply}" )
             if reply.function_call:
                 func_name = reply.function_call.name
                 try:
@@ -68,9 +84,16 @@ async def chat():
                     resource_uri = resource_name_map[func_name]
                     resource_contents = await client.read_resource(resource_uri)
                     tool_result = resource_contents[0].text if resource_contents else "Keine Inhalte gefunden."
+                
+                elif func_name in [prompt.name for prompt in available_prompts]:
+                    tool_result_messages = await client.get_prompt(func_name, func_args)
+                    tool_result = "\n".join(
+                        msg.content.text for msg in tool_result_messages if hasattr(msg.content, "text")
+                    )
 
                 else:
                     tool_result = f"Unbekannte Funktion: {func_name}"
+                
                 print(f"[Tool aufgerufen: {func_name}]")
                 print(f"[Tool aufgerufen: {tool_result}]") 
 
@@ -107,5 +130,4 @@ async def chat():
         await client.close()
 
 if __name__ == "__main__":
-    print("!")
     asyncio.run(chat())

@@ -24,7 +24,9 @@ class MCPClient:
 
         tools_result = await self._session.list_tools()
         resources_result = await self._session.list_resources()
-        return tools_result.tools, resources_result.resources
+        prompts_result = await self._session.list_prompts()
+
+        return tools_result.tools, resources_result.resources, prompts_result.prompts
 
     async def call_tool(self, tool_name: str, arguments: dict):
         if self._session is None:
@@ -41,6 +43,10 @@ class MCPClient:
         except:
             return "Error"
         return result.contents
+    
+    async def get_prompt(self, name, arguments):
+        result = await self._session.get_prompt(name, arguments)
+        return result.messages 
 
     async def close(self):
         if self._stack is not None:
@@ -55,6 +61,8 @@ async def main():
     print(output_tool)
     output_resource = await client.read_resource("text://greeting")
     print(output_resource)
+    output_prompt = await client.get_prompt("simple_greeting", {"name": "AceDragoon"})
+    print(output_prompt)
     await client.close()
 
 if __name__ == "__main__":
