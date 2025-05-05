@@ -1,4 +1,4 @@
-#client.py
+#stdio_client.py
 import asyncio
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
@@ -9,13 +9,13 @@ class MCPClient:
         self._session = None
         self._stack = None
 
-    async def start_client(self):
+    async def start_client(self,command,args):
         self._stack = AsyncExitStack()
         await self._stack.__aenter__()
 
         server_params = StdioServerParameters(
-            command="python",
-            args=["server.py"],
+            command=command,
+            args=args,
         )
         stdio = await self._stack.enter_async_context(stdio_client(server_params))
         read_stream, write_stream = stdio
@@ -51,8 +51,11 @@ class MCPClient:
 
     async def close(self):
         if self._stack is not None:
-            await self._stack.aclose()
-
+            try:
+                await asyncio.sleep(0.1)  # Zeit für sauberen Abbau
+                await self._stack.aclose()
+            except Exception as e:
+                print(f"[WARN] Fehler beim Schließen einer Session: {e}")
 
 async def main():
     client = MCPClient()

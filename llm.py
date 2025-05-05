@@ -1,8 +1,9 @@
+#llm.py
 import os
 import asyncio
 import json
 from openai import OpenAI
-from client import MCPClient
+from servermanagers.manager import Manager
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -11,8 +12,8 @@ client_openai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 messages = [{"role": "system", "content": "Du bist ein hilfreicher KI-Assistent."}]
 async def chat():
-    client = MCPClient()
-    available_tools, resources, available_prompts = await client.start_client()
+    manager = Manager()
+    available_tools, resources, available_prompts = await manager.add_session()
     resource_name_map = {}
 
     for res in resources:
@@ -64,7 +65,8 @@ async def chat():
                             }
                     }
                     for prompt in available_prompts
-                ],
+                ]
+                ,
                 function_call="auto",
             )
 
