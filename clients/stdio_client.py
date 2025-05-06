@@ -9,7 +9,7 @@ class MCPClient:
         self._session = None
         self._stack = None
 
-    async def start_client(self,command,args):
+    async def start_client(self,command,args,name):
         self._stack = AsyncExitStack()
         await self._stack.__aenter__()
 
@@ -26,6 +26,7 @@ class MCPClient:
         tools_result = await self._session.list_tools()
         resources_result = await self._session.list_resources()
         prompts_result = await self._session.list_prompts()
+        
 
         return tools_result.tools, resources_result.resources, prompts_result.prompts
 
