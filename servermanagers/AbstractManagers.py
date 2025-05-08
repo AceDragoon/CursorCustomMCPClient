@@ -9,7 +9,3 @@ class AbstractManager(ABC):
     @abstractmethod
     async def add_session(self):
         pass
-
-    @abstractmethod
-    async def make_request(self):
-        pass

@@ -1,6 +1,13 @@
 from mcp.server.fastmcp import FastMCP
+from dotenv import load_dotenv
 
-mcp = FastMCP(name="Demo")
+load_dotenv("../.env")
+
+mcp = FastMCP(
+    name="Demo",
+    host="0.0.0.0",  # only used for SSE transport (localhost)
+    port=8050,  # only used for SSE transport (set this to any port)
+)
 
 @mcp.tool()
 def add(a: int, b: int) -> int:

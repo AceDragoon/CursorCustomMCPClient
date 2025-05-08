@@ -4,11 +4,11 @@ from abc import ABC, abstractmethod
 class AbstractMCPClient(ABC):
 
     @abstractmethod
-    async def start_client(self):
+    async def start_session(self):
         pass
 
     @abstractmethod
-    async def call_tool(self):
+    async def call_tool(self, name, command, args):
         pass
 
     @abstractmethod

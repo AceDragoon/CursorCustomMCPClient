@@ -1,32 +1,30 @@
-#stdio_client.py
+#sse_client.py
 import asyncio
-from mcp import ClientSession, StdioServerParameters
-from mcp.client.stdio import stdio_client
+from mcp import ClientSession
+from mcp.client.sse import sse_client
 from contextlib import AsyncExitStack
 from mcp_experimental.clients.AbstractClient import AbstractMCPClient
 
-class MCPstdioClient(AbstractMCPClient):
+class MCPsseClient(AbstractMCPClient):
     def __init__(self):
+        self._session = None
         self._stack = None
 
-    async def start_session(self, command, args):
+    async def start_session(self, url):
         self._stack = AsyncExitStack()
-        await self._stack.__aenter__()
 
-        server_params = StdioServerParameters(
-            command=command,
-            args=args,
-        )
-        stdio = await self._stack.enter_async_context(stdio_client(server_params))
-        read_stream, write_stream = stdio
+        # Stelle Verbindung über SSE her
+        sse = await self._stack.enter_async_context(sse_client(url))
+        read_stream, write_stream = sse
 
+        # Initialisiere die ClientSession
         _session = await self._stack.enter_async_context(ClientSession(read_stream, write_stream))
         await _session.initialize()
 
+        # Lade Tools, Ressourcen und Prompts
         tools_result = await _session.list_tools()
         resources_result = await _session.list_resources()
         prompts_result = await _session.list_prompts()
-        
 
         return _session, tools_result.tools, resources_result.resources, prompts_result.prompts
 
@@ -59,13 +57,14 @@ class MCPstdioClient(AbstractMCPClient):
                 print(f"[WARN] Fehler beim Schließen einer Session: {e}")
 
 async def main():
-    client = MCPstdioClient()
-    session, a, b, c = await client.start_session("python",["C://Users//User//Desktop//AI Code//MCP//CursorCustomMCPClient2//mcp-experimental//server.py"])
-    output_tool = await client.call_tool(session, "add", {"a": 5, "b": 8})
+    client = MCPsseClient()
+    session, a, b , c = await client.start_session("http://127.0.0.1:8050/sse")
+    print(session)
+    output_tool = await client.call_tool(session,"add", {"a": 5, "b": 8})
     print(output_tool)
-    output_resource = await client.read_resource(session, "text://greeting")
+    output_resource = await client.read_resource(session,"text://greeting")
     print(output_resource)
-    output_prompt = await client.get_prompt(session, "simple_greeting", {"name": "AceDragoon"})
+    output_prompt = await client.get_prompt(session,"simple_greeting", {"name": "AceDragoon"})
     print(output_prompt)
     await client.close()
 
