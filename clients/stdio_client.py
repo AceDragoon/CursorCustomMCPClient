@@ -30,12 +30,19 @@ class MCPstdioClient(AbstractMCPClient):
 
         return _session, tools_result.tools, resources_result.resources, prompts_result.prompts
 
-    async def call_tool(self, _session, tool_name: str, arguments: dict):
-        if _session is None:
-            raise Exception("Session wurde noch nicht gestartet! Bitte zuerst start_client() aufrufen.")
-        
-        result = await _session.call_tool(tool_name, arguments)
+    async def call_tool(self, command, args, tool_name: str, arguments: dict):
+        server_params = StdioServerParameters(
+            command=command,  # The command to run your server
+            args=args,  # Arguments to the command
+        )
+        # Connect to the server
+        async with stdio_client(server_params) as (read_stream, write_stream):
+            async with ClientSession(read_stream, write_stream) as session:
+                # Initialize the connection
+                await session.initialize()
+                result = await session.call_tool(tool_name, arguments)
         return result.content
+    
     
     async def read_resource(self, _session, uri):
         if _session is None:
@@ -60,13 +67,15 @@ class MCPstdioClient(AbstractMCPClient):
 
 async def main():
     client = MCPstdioClient()
-    session, a, b, c = await client.start_session("python",["C://Users//User//Desktop//AI Code//MCP//CursorCustomMCPClient2//mcp-experimental//server.py"])
+    session, a, b, c = await client.start_session("python",["C://Users//User//Desktop//AI Code//MCP//CursorCustomMCPClient2//mcp_experimental//server.py"])
     output_tool = await client.call_tool(session, "add", {"a": 5, "b": 8})
     print(output_tool)
     output_resource = await client.read_resource(session, "text://greeting")
     print(output_resource)
     output_prompt = await client.get_prompt(session, "simple_greeting", {"name": "AceDragoon"})
     print(output_prompt)
+    await client.close()
+    session, a, b, c = await client.start_session("python",["C://Users//User//Desktop//AI Code//MCP//CursorCustomMCPClient2//mcp_experimental//example_server.py"])
     await client.close()
 
 if __name__ == "__main__":

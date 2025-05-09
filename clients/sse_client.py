@@ -28,11 +28,13 @@ class MCPsseClient(AbstractMCPClient):
 
         return _session, tools_result.tools, resources_result.resources, prompts_result.prompts
 
-    async def call_tool(self, _session, tool_name: str, arguments: dict):
-        if _session is None:
-            raise Exception("Session wurde noch nicht gestartet! Bitte zuerst start_client() aufrufen.")
+    async def call_tool(self, url, tool_name: str, arguments: dict):
+        async with sse_client(url) as (read_stream, write_stream):
+            async with ClientSession(read_stream, write_stream) as session:
+                # Initialize the connection
+                await session.initialize()
+                result = await session.call_tool(tool_name, arguments)
         
-        result = await _session.call_tool(tool_name, arguments)
         return result.content
     
     async def read_resource(self, _session, uri):

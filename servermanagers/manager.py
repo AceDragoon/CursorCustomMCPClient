@@ -28,21 +28,56 @@ class Manager(AbstractManager):
                     session = await client.start_session(server.get("url"))
                 elif "command" in server:
                     client = MCPstdioClient()
-                    print(server.get("command"), server.get("args"))
                     session = await client.start_session(server.get("command"), server.get("args"))
                 self.sessions[name] = session
                 self.clients.append(client)
+                await client.close()
+                print(f"Server {name} initialisiert")
         return self.sessions
     
+    async def get_functions(self):
+        all_tools, all_resources, all_prompts = [], [], []
+
+        for session in self.sessions.values():
+            tools, resources, prompts = session[1:]  # überspringe ClientSession
+            all_tools += tools
+            all_resources += resources
+            all_prompts += prompts
+
+        return (all_tools, all_resources, all_prompts)
+    
+    def find_server_by_toolname(self, tool_name: str) -> str | None:
+        for server_name, session_data in self.sessions.items():
+            tools = session_data[1]  # Tools sind an zweiter Stelle
+            for tool in tools:
+                if tool.name == tool_name:
+                    return server_name
+        return None  # Falls kein passender Server gefunden wurde    
+    
+    async def make_request(self, tool_name, arguments):
+        server_name = self.find_server_by_toolname(tool_name)
+        server = self.config.get("mcpServers", {}).get(server_name)
+        if "url" in server:
+            client = MCPsseClient()
+            function_result = await client.call_tool(server.get("url"), tool_name, arguments)
+        elif "command" in server:
+            client = MCPstdioClient()
+            function_result = await client.call_tool(server.get("command"), server.get("args"), tool_name, arguments)
+        
+        return function_result
+        
+    
     async def shutdown(self):
-        for client in self.clients:
-            await client.close()
+        pass
 
 async def main():
     manager = Manager()
     await manager.add_session()
     await manager.shutdown()
-
+    functions = await manager.get_functions()
+    print(functions)
+    function_result = await manager.make_request("add", {"a": 5, "b": 8})
+    print(function_result)
 
 
 if __name__ == "__main__":
