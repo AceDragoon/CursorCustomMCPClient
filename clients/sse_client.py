@@ -37,17 +37,20 @@ class MCPsseClient(AbstractMCPClient):
         
         return result.content
     
-    async def read_resource(self, _session, uri):
-        if _session is None:
-            raise Exception("Session wurde noch nicht gestartet! Bitte zuerst start_client() aufrufen.")
-        try:
-            result = await _session.read_resource(uri)
-        except:
-            return "Error"
+    async def read_resource(self, url, uri, arguments):
+        async with sse_client(url) as (read_stream, write_stream):
+            async with ClientSession(read_stream, write_stream) as session:
+                # Initialize the connection
+                await session.initialize()
+                result = await session.read_resource(uri)
         return result.contents
     
-    async def get_prompt(self, _session, name, arguments):
-        result = await _session.get_prompt(name, arguments)
+    async def get_prompt(self, url, name, arguments):
+        async with sse_client(url) as (read_stream, write_stream):
+            async with ClientSession(read_stream, write_stream) as session:
+                # Initialize the connection
+                await session.initialize()
+                result = await session.get_prompt(name, arguments)
         return result.messages 
 
     async def close(self):

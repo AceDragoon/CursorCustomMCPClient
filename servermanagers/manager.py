@@ -46,23 +46,36 @@ class Manager(AbstractManager):
 
         return (all_tools, all_resources, all_prompts)
     
-    def find_server_by_toolname(self, tool_name: str) -> str | None:
+    def find_server_by_function_name(self, function_name: str) -> str | None:
         for server_name, session_data in self.sessions.items():
-            tools = session_data[1]  # Tools sind an zweiter Stelle
-            for tool in tools:
-                if tool.name == tool_name:
-                    return server_name
-        return None  # Falls kein passender Server gefunden wurde    
+            for index, function_list in enumerate(session_data[1:]):  # [1]=Tools, [2]=Resources, [3]=Prompts
+                for obj in function_list:
+                    if obj.name == function_name:
+                        return server_name, index  # index: 0 = Tool, 1 = Resource, 2 = Prompt
+        return None   
     
-    async def make_request(self, tool_name, arguments):
-        server_name = self.find_server_by_toolname(tool_name)
+    async def make_request(self, function_name, arguments):
+        server_name, type = self.find_server_by_function_name(function_name)
         server = self.config.get("mcpServers", {}).get(server_name)
+        print(server_name, type)
         if "url" in server:
             client = MCPsseClient()
-            function_result = await client.call_tool(server.get("url"), tool_name, arguments)
+            print("sse")
+            if type == 0:
+                function_result = await client.call_tool(server.get("url"), function_name, arguments)
+            elif type == 1:
+                function_result = await client.read_resource(server.get("url"), function_name, arguments)
+            elif type == 2:
+                function_result = await client.get_prompt(server.get("url"), function_name, arguments)
         elif "command" in server:
             client = MCPstdioClient()
-            function_result = await client.call_tool(server.get("command"), server.get("args"), tool_name, arguments)
+            print("stdio")
+            if type == 0:
+                function_result = await client.call_tool(server.get("command"), server.get("args"), function_name, arguments)
+            if type == 1:
+                function_result = await client.read_resource(server.get("command"), server.get("args"), function_name, arguments)
+            if type == 2:
+                function_result = await client.get_prompt(server.get("command"), server.get("args"), function_name, arguments)
         
         return function_result
         
@@ -73,10 +86,8 @@ class Manager(AbstractManager):
 async def main():
     manager = Manager()
     await manager.add_session()
-    await manager.shutdown()
-    functions = await manager.get_functions()
-    print(functions)
-    function_result = await manager.make_request("add", {"a": 5, "b": 8})
+    await manager.get_functions()
+    function_result = await manager.make_request("Username", {})
     print(function_result)
 
 

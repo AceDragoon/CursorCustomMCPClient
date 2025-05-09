@@ -38,24 +38,34 @@ class MCPstdioClient(AbstractMCPClient):
         # Connect to the server
         async with stdio_client(server_params) as (read_stream, write_stream):
             async with ClientSession(read_stream, write_stream) as session:
-                # Initialize the connection
                 await session.initialize()
                 result = await session.call_tool(tool_name, arguments)
         return result.content
     
     
-    async def read_resource(self, _session, uri):
-        if _session is None:
-            raise Exception("Session wurde noch nicht gestartet! Bitte zuerst start_client() aufrufen.")
-        try:
-            result = await _session.read_resource(uri)
-        except:
-            return "Error"
+    async def read_resource(self, command, args, res_uri: str, arguments: dict ):
+        server_params = StdioServerParameters(
+            command=command,  # The command to run your server
+            args=args,  # Arguments to the command
+        )
+        # Connect to the server
+        async with stdio_client(server_params) as (read_stream, write_stream):
+            async with ClientSession(read_stream, write_stream) as session:
+                await session.initialize()
+                result = await session.read_resource(res_uri)
         return result.contents
     
-    async def get_prompt(self, _session, name, arguments):
-        result = await _session.get_prompt(name, arguments)
-        return result.messages 
+    async def get_prompt(self, command, args, name, arguments):
+        server_params = StdioServerParameters(
+            command=command,  # The command to run your server
+            args=args,  # Arguments to the command
+        )
+        # Connect to the server
+        async with stdio_client(server_params) as (read_stream, write_stream):
+            async with ClientSession(read_stream, write_stream) as session:
+                await session.initialize()
+                result = await session.get_prompt(name, arguments)
+        return result.messages
 
     async def close(self):
         if self._stack is not None:
