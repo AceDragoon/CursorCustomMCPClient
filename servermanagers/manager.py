@@ -33,7 +33,8 @@ class Manager(AbstractManager):
                 self.clients.append(client)
                 await client.close()
                 print(f"Server {name} initialisiert")
-        return self.sessions
+        functions = await self.get_functions()
+        return functions
     
     async def get_functions(self):
         all_tools, all_resources, all_prompts = [], [], []
@@ -55,6 +56,7 @@ class Manager(AbstractManager):
         return None   
     
     async def make_request(self, function_name, arguments):
+        print(f"Request made: {function_name, arguments}")
         server_name, type = self.find_server_by_function_name(function_name)
         server = self.config.get("mcpServers", {}).get(server_name)
         print(server_name, type)
@@ -64,7 +66,8 @@ class Manager(AbstractManager):
             if type == 0:
                 function_result = await client.call_tool(server.get("url"), function_name, arguments)
             elif type == 1:
-                function_result = await client.read_resource(server.get("url"), function_name, arguments)
+                result = await client.read_resource(server.get("url"), function_name, arguments)
+                function_result = result[0].text
             elif type == 2:
                 function_result = await client.get_prompt(server.get("url"), function_name, arguments)
         elif "command" in server:
@@ -73,10 +76,11 @@ class Manager(AbstractManager):
             if type == 0:
                 function_result = await client.call_tool(server.get("command"), server.get("args"), function_name, arguments)
             if type == 1:
-                function_result = await client.read_resource(server.get("command"), server.get("args"), function_name, arguments)
+                result = await client.read_resource(server.get("command"), server.get("args"), function_name, arguments)
+                function_result = result[0].text
             if type == 2:
                 function_result = await client.get_prompt(server.get("command"), server.get("args"), function_name, arguments)
-        
+        print(f"Request result : {function_result}")
         return function_result
         
     
