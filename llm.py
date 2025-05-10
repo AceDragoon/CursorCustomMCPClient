@@ -11,7 +11,15 @@ load_dotenv()
 
 client_openai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-messages = [{"role": "system", "content": "Du bist ein hilfreicher KI-Assistent."}]
+messages = [{
+    "role": "system",
+    "content": (
+        "Du bist ein hilfreicher KI-Assistent. "
+        "Wenn der Benutzer eine Aufgabe beschreibt, die mehrere Funktionen erfordert, "
+        "führe sie automatisch nacheinander aus. "
+        "Du darfst mehrere function_calls hintereinander tätigen, ohne den Benutzer vorher zu fragen."
+    )
+}]
 async def chat():
     manager = Manager()
     available_tools, resources, available_prompts = await manager.add_session()
@@ -74,62 +82,91 @@ async def chat():
             )
 
             reply = response.choices[0].message
-            print(f"Reply: {reply}" )
-            if reply.function_call:
-                func_name = reply.function_call.name
-                try:
-                    func_args = json.loads(reply.function_call.arguments)
-                except json.JSONDecodeError:
-                    func_args = {}
-                
-                
 
-                if func_name in resource_name_map:
-                    func_name = resource_name_map[func_name]
-                    tool_result = await manager.make_request(func_name, func_args)
-                else:
-                    tool_result = await manager.make_request(func_name, func_args)
-                
-                print(f"[Tool aufgerufen: {func_name}]")
-                print(f"[Tool aufgerufen: {tool_result}]") 
+            # Max. 5 Function-Calls hintereinander (sicheres Multi-Tool-Chaining)
+            for _ in range(5):
+                if reply.function_call:
+                    func_name = reply.function_call.name
+                    try:
+                        func_args = json.loads(reply.function_call.arguments)
+                    except json.JSONDecodeError:
+                        func_args = {}
 
-                gpt_func_name = reverse_resource_map.get(func_name, func_name)
-                messages.append({
-                    "role": "assistant",
-                    "content": None,
-                    "function_call": {
-                        "name": gpt_func_name,
-                        "arguments": reply.function_call.arguments
-                    }
-                })
-                
-                messages.append({
-                    "role": "function",
-                    "name": gpt_func_name,
-                    "content": tool_result
-                })
-                
-                try:
+                    # Resource-Mapping prüfen
+                    if func_name in resource_name_map:
+                        real_name = resource_name_map[func_name]
+                    else:
+                        real_name = func_name
+
+                    tool_result = await manager.make_request(real_name, func_args)
+
+                    # GPT-kompatiblen Namen rekonstruieren
+                    gpt_name = reverse_resource_map.get(real_name, real_name)
+
+                    messages.append({
+                        "role": "assistant",
+                        "content": None,
+                        "function_call": {
+                            "name": gpt_name,
+                            "arguments": reply.function_call.arguments
+                        }
+                    })
+                    messages.append({
+                        "role": "function",
+                        "name": gpt_name,
+                        "content": str(tool_result)
+                    })
+
+                    # GPT erneut aufrufen
                     followup_response = client_openai.chat.completions.create(
                         model="gpt-3.5-turbo",
                         messages=messages,
                         temperature=0.7,
+                        functions=[
+                            {
+                                "name": tool.name,
+                                "description": tool.description,
+                                "parameters": tool.inputSchema
+                            }
+                            for tool in available_tools
+                        ] + [
+                                {
+                                "name": name,
+                                "description": next(res.description for res in resources if str(res.uri) == uri),
+                                "parameters": {
+                                    "type": "object",
+                                    "properties": {},
+                                    "required": []
+                                }
+                            }
+                            for name, uri in resource_name_map.items()
+                        ] + [
+                                {
+                                    "name": prompt.name,
+                                    "description": prompt.description,
+                                    "parameters": {
+                                        "type": "object",
+                                        "properties": {
+                                            arg.name: {
+                                                "type": "string",  # du kannst auf "string" gehen, wenn du nichts anderes weißt
+                                                "description": arg.description or f"{arg.name} (kein Beschreibungstext vorhanden)"
+                                            } for arg in prompt.arguments
+                                        },
+                                        "required": [arg.name for arg in prompt.arguments if arg.required]
+                                    }
+                            }
+                            for prompt in available_prompts
+                        ]
+                        ,
+                        function_call="auto",
                     )
-                except Exception as e:
-                    print("FEHLER beim Follow-up-Request:")
-                    print(e)
-                    traceback.print_exc()
-                    print("Letzte Nachricht war:")
-                    print(json.dumps(messages[-1], indent=2))
-                    return
-                followup_reply = followup_response.choices[0].message
-                print("!")
-                print(f"GPT: {followup_reply.content}")
-                messages.append({"role": "assistant", "content": followup_reply.content})
-                print("!")
-            else:
-                print(f"GPT: {reply.content}")
-                messages.append({"role": "assistant", "content": reply.content})
+                    
+                    reply = followup_response.choices[0].message
+                else:
+                    if reply.content:
+                        print(f"GPT: {reply.content}")
+                        messages.append({"role": "assistant", "content": reply.content})
+                    break
 
     except:
         print("Error!")

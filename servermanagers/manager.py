@@ -56,13 +56,10 @@ class Manager(AbstractManager):
         return None   
     
     async def make_request(self, function_name, arguments):
-        print(f"Request made: {function_name, arguments}")
         server_name, type = self.find_server_by_function_name(function_name)
         server = self.config.get("mcpServers", {}).get(server_name)
-        print(server_name, type)
         if "url" in server:
             client = MCPsseClient()
-            print("sse")
             if type == 0:
                 function_result = await client.call_tool(server.get("url"), function_name, arguments)
             elif type == 1:
@@ -72,7 +69,6 @@ class Manager(AbstractManager):
                 function_result = await client.get_prompt(server.get("url"), function_name, arguments)
         elif "command" in server:
             client = MCPstdioClient()
-            print("stdio")
             if type == 0:
                 function_result = await client.call_tool(server.get("command"), server.get("args"), function_name, arguments)
             if type == 1:
