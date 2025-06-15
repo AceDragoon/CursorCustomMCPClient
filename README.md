@@ -72,6 +72,6 @@ Im Verlauf habe ich einen eigenen Client entwickelt, der mit dem MCP-Server übe
 
 - [x] Unterstützung für mehrere Server gleichzeitig vorbereiten.
 - [x] Das Hinzufügen von Servern über eine server_config.json.
-- [ ] Wiederholtes aufrufen von Funktionen möglich machen
+- [x] Wiederholtes aufrufen von Funktionen möglich machen
 - [ ] Server Überarbeitung
 - [ ] Integration von Ollama.

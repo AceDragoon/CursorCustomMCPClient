@@ -14,9 +14,9 @@ def add(a: int, b: int) -> int:
     """Add two numbers"""
     return a + b
 
-@mcp.resource(uri="text://greeting", description="Ein freundlicher Gruß")
-def greeting() -> str:
-    return "Willkommen beim MCP-Server!"
+#@mcp.resource(uri="text://greeting", description="Ein freundlicher Gruß")
+#def greeting() -> str:
+#    return "Willkommen beim MCP-Server!"
 
 @mcp.resource(uri="time://now", description="Aktuelle Serverzeit")
 def current_time() -> str:
@@ -35,6 +35,8 @@ def simple_greeting(name: str) -> list:
             }
         }
     ]
+
+
 
 
 

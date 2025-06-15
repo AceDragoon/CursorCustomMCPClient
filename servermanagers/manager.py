@@ -56,6 +56,7 @@ class Manager(AbstractManager):
         return None   
     
     async def make_request(self, function_name, arguments):
+        print(arguments)
         server_name, type = self.find_server_by_function_name(function_name)
         server = self.config.get("mcpServers", {}).get(server_name)
         if "url" in server:

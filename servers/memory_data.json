@@ -1,0 +1,33 @@
+{
+  "reminders": [
+    {
+      "reminders": [],
+      "contacts": {}
+    },
+    {
+      "title": "Buy groceries",
+      "time": "2025-05-26T18:24:23",
+      "status": "notified"
+    },
+    {
+      "title": "Kaffeezeit",
+      "time": "2025-05-26T16:41:10",
+      "status": "notified"
+    },
+    {
+      "title": "Kaffeezeit",
+      "time": "2025-05-26T17:32:19",
+      "status": "notified"
+    },
+    {
+      "title": "Einkaufen",
+      "time": "2025-05-26T23:31:47",
+      "status": "notified"
+    },
+    {
+      "title": "Spaziergang",
+      "time": "2025-05-26T23:57:53",
+      "status": "notified"
+    }
+  ]
+}

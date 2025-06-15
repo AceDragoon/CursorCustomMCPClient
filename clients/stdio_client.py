@@ -80,11 +80,6 @@ async def main():
     session, a, b, c = await client.start_session("python",["C://Users//User//Desktop//AI Code//MCP//CursorCustomMCPClient2//mcp_experimental//server.py"])
     output_tool = await client.call_tool(session, "add", {"a": 5, "b": 8})
     print(output_tool)
-    output_resource = await client.read_resource(session, "text://greeting")
-    print(output_resource)
-    output_prompt = await client.get_prompt(session, "simple_greeting", {"name": "AceDragoon"})
-    print(output_prompt)
-    await client.close()
     session, a, b, c = await client.start_session("python",["C://Users//User//Desktop//AI Code//MCP//CursorCustomMCPClient2//mcp_experimental//example_server.py"])
     await client.close()
 
