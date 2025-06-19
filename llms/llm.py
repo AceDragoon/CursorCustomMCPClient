@@ -100,7 +100,8 @@ async def chat():
                     real_name = resource_name_map[func_name]
                 else:
                     real_name = func_name
-
+                print(f"Function name: {type(real_name)}")
+                print(f"Arguments: {type(func_args)}")
                 tool_result = await manager.make_request(real_name, func_args)
 
                 # GPT-kompatiblen Namen rekonstruieren

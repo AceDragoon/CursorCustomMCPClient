@@ -2,33 +2,36 @@ from abc import ABC, abstractmethod
 
 class AbstractLLM(ABC):
     @abstractmethod
-    async def message_from_user(self) -> str:
+    async def load_config(self) -> dict:
         pass
 
     @abstractmethod
-    async def retrieve_tools(self) -> list:
+    async def load_tools(self) -> dict:
         pass
     
     @abstractmethod
-    async def retrieve_config(self) -> dict:
+    async def user_message(self) -> dict:
         pass
 
     @abstractmethod
-    async def create_functions(self) -> str:
+    async def system_message(self, messages, tools,temperature) -> dict:
         pass
 
     @abstractmethod
-    async def generate_response(self, prompt: str, system_prompt: str, tools: list, repetition: int, temperature: float) -> str:
-        pass
-
-    @abstractmethod
-    async def function_call(self, function_call: str) -> str:
+    async def tool_call(self, name, args) -> list:
         pass
     
     @abstractmethod
-    async def main_loop(self) -> None:
+    async def workflow(self) -> None:
+        pass
+    @abstractmethod
+    async def logic(self) -> None:
         pass
 
     @abstractmethod
-    async def close(self) -> None:
+    async def layout(self) -> None:
+        pass
+
+    @abstractmethod
+    async def main(self) -> None:
         pass

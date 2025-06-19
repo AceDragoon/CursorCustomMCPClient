@@ -53,12 +53,13 @@ class Manager(AbstractManager):
                 for obj in function_list:
                     if obj.name == function_name:
                         return server_name, index  # index: 0 = Tool, 1 = Resource, 2 = Prompt
-        return None   
+        return None, None
     
     async def make_request(self, function_name, arguments):
         print(arguments)
+        config = await self.load_config()
         server_name, type = self.find_server_by_function_name(function_name)
-        server = self.config.get("mcpServers", {}).get(server_name)
+        server = config.get("mcpServers", {}).get(server_name)
         if "url" in server:
             client = MCPsseClient()
             if type == 0:
@@ -88,7 +89,7 @@ async def main():
     manager = Manager()
     await manager.add_session()
     await manager.get_functions()
-    function_result = await manager.make_request("Username", {})
+    function_result = await manager.make_request("save_graphviz_diagram", {'code': 'digraph G {\n  A -> B;\n  B -> C;\n  C -> A;\n}', 'filename': 'mini_diagram'})
     print(function_result)
 
 

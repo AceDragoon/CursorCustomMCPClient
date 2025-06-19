@@ -8,81 +8,103 @@ from mcp_experimental.servermanagers.manager import Manager
 from mcp_experimental.llms.AbstractLLM import AbstractLLM
 from dotenv import load_dotenv
 from mcp_experimental.utils.paths import get_project_base
+import traceback
+import base64
 
 load_dotenv()
 
 client_openai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 class DiagramLLM(AbstractLLM):
+
     def __init__(self):
         self.manager = Manager()
-        pass
+    
+    async def load_image(self, image_path="RAG_Diagram.png") -> dict:
+        # 1. Bild einlesen & base64 encodieren
+        with open(get_project_base() / image_path, "rb") as f:
+            img_b64 = base64.b64encode(f.read()).decode()
 
+        # 2. content als LISTE definieren!
+        return {
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "Bewerte bitte die Logik dieses Diagramms anhand des Bildes."
+                },
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:image/png;base64,{img_b64}"
+                    }
+                }
+            ]
+        }
 
-    async def retrieve_config(self, config_path) -> dict:
+    async def load_config(self, config_path = "testconfig.yaml") -> dict:
         with open(get_project_base() / config_path, "r", encoding="utf-8") as file:
             config = yaml.safe_load(file)
         return config
     
-    async def retrieve_tools(self) -> list:
-        available_tools, available_resources, available_prompts = await self.manager.add_session()
-        resources = self.build_resource_maps(available_resources)
-        print(resources)
-        return available_tools, available_resources, available_prompts
 
-    def build_resource_maps(self, resources):
-        resource_name_map = {}
-        reverse_resource_map = {}
-        for res in resources:
-            gpt_name = str(res.uri).replace("://", "_").replace("/", "_")
-            resource_name_map[gpt_name] = str(res.uri)
-            reverse_resource_map[str(res.uri)] = gpt_name
-        return resource_name_map
+    async def load_tools(self) -> list:
+        tools, resources, prompts = await self.manager.add_session()
 
-    async def message_from_user(self) -> str:
-        user_input = input("Enter your message: ")
-        return {"role": "user", "content": [{"type": "text","text": user_input }]}
-    
-    
-    async def create_functions(self, tools, resources, prompts) -> str:
         structured_functions=[
-                    {
-                        "name": tool.name,
-                        "description": tool.description,
-                        "parameters": tool.inputSchema
+            {
+                "name": tool.name,
+                "description": tool.description,
+                "parameters": tool.inputSchema
+            }
+            for tool in tools
+        ] + [
+                {
+                "name": resource.name.replace("://", "_"),
+                "description": resource.description,
+                "parameters": {
+                    "type": "object",
+                    "properties": {},
+                    "required": []
+                }
+            }
+            for resource in resources
+        ] + [
+                {
+                    "name": prompt.name,
+                    "description": prompt.description,
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            arg.name: {
+                                "type": "string",  # du kannst auf "string" gehen, wenn du nichts anderes weißt
+                                "description": arg.description or f"{arg.name} (kein Beschreibungstext vorhanden)"
+                            } for arg in prompt.arguments
+                        },
+                        "required": [arg.name for arg in prompt.arguments if arg.required]
                     }
-                    for tool in tools
-                ] + [
-                        {
-                        "name": resources[0].name.replace("://", "_"),
-                        "description": resources[0].description,
-                        "parameters": {
-                            "type": "object",
-                            "properties": {},
-                            "required": []
-                        }
-                    }
-                    for resource in resources
-                ] + [
-                        {
-                            "name": prompt.name,
-                            "description": prompt.description,
-                            "parameters": {
-                                "type": "object",
-                                "properties": {
-                                    arg.name: {
-                                        "type": "string",  # du kannst auf "string" gehen, wenn du nichts anderes weißt
-                                        "description": arg.description or f"{arg.name} (kein Beschreibungstext vorhanden)"
-                                    } for arg in prompt.arguments
-                                },
-                                "required": [arg.name for arg in prompt.arguments if arg.required]
-                            }
-                    }
-                    for prompt in prompts
-                ]
+            }
+            for prompt in prompts
+        ]
+
         return structured_functions
 
-    async def generate_response(self, messages, tools: list, model: str, temperature: float):
+
+    def user_message(self) -> str:
+        user_input = input("Enter your message: ")
+        return {
+            "role": "user",
+            "content": [
+                {
+                "type": "text",
+                "text": user_input 
+                }
+                ]
+            }
+
+
+    async def system_message(self, messages: list, tools: list, model: str, temperature: float):
+
         response = client_openai.chat.completions.create(
             model=model,
             messages=messages,
@@ -90,25 +112,28 @@ class DiagramLLM(AbstractLLM):
             functions=tools,
             function_call="auto",
         )
-        return response
+
+        return response.choices[0].message
     
-    async def function_call(self, function_call) -> str:
-        func_name = function_call.name
+
+    async def tool_call(self, reply) -> str:
+        func_name = reply.function_call.name
+
         try:
-            func_args = json.loads(function_call.arguments or "{}")
+            func_args = json.loads(reply.function_call.arguments)
         except json.JSONDecodeError:
+            print(traceback.format_exc())
             func_args = {}
-        try:
-            uri = function_call[0].name.replace("://", "_"),
-        except:
-            uri = function_call
-        tool_result = await self.manager.make_request(uri, func_args)
+
+        tool_result = await self.manager.make_request(func_name, func_args)
+
+
         return  {
                     "role": "assistant",
                     "content": None,
                     "function_call": {
                         "name": func_name,
-                        "arguments": function_call.function_call.arguments
+                        "arguments": str(func_args)
                     }
                 },{
                     "role": "function",
@@ -116,29 +141,152 @@ class DiagramLLM(AbstractLLM):
                     "content": str(tool_result)
                 }
     
-    async def main_loop(self) -> None:
-        config = await self.retrieve_config("config.yaml")
-        messages = []
-        tools, resources, prompts = await self.retrieve_tools()
-        structured_funcions = await self.create_functions(tools, resources, prompts)
-        messages.append( await self.message_from_user())
-        for name, system_prompt in config["system_prompts"].items():
-            messages.extend(system_prompt)
-            response = await self.generate_response(messages, structured_funcions, "gpt-4.1-mini", 0.7)
-            reply = response.choices[0].message
-            del messages[-1]
-            if reply.function_call:
-                await self.function_call(reply.function_call)
-            elif reply.content:
+
+    async def workflow(self, prompt:list, systemprompt:str, memory) -> list:
+        tools = await self.load_tools()
+
+        memory.extend(prompt) # list
+        memory.append({
+            "role" : "system",
+            "content" : systemprompt
+        })
+        
+        reply = await self.system_message(memory, tools, "gpt-4.1-mini", 0.7)
+        del memory[-len(prompt)-1:]
+
+        if reply.function_call:
+            resultat = await self.tool_call(reply)
+            memory.extend(resultat)
+        else:
+            if reply.content:
                 print(f"GPT: {reply.content}")
-                messages.append({"role": "assistant", "content": reply.content})
-        return
+                memory.append({"role": "assistant", "content": reply.content})
+
+        return memory
     
-    async def close(self) -> None:
-        pass
+
+    async def rating(self, prompt, systemprompt:str, memory, ratings):
+        rating_tool = [{
+    "name": "rate_diagram",
+    "description": "Bewertet ein Diagramm anhand seiner Logik. Gibt eine Bewertung (1-10) und eine Begründung zurück.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "rating": {
+                "type": "integer",
+                "description": "Eine Zahl zwischen 1 (schlecht) und 10 (sehr gut), die die logische Schlüssigkeit des Diagramms bewertet."
+            },
+            "reason": {
+                "type": "string",
+                "description": "Eine kurze Begründung für die Bewertung."
+            }
+        },
+        "required": ["rating", "reason"]
+    }
+}]
+        
+        memory.extend(ratings)
+        memory.append({
+            "role" : "system",
+            "content" : systemprompt
+        })
+        memory.append(prompt)
+
+        reply = await self.system_message(memory, rating_tool, "gpt-4.1-mini", 0.7)
+        del memory[-len(prompt)-2:]
+        if reply.function_call:
+            arguments_str = reply.function_call.arguments
+            
+            arguments = json.loads(arguments_str)
+
+            rating = arguments.get("rating")
+            reason = arguments.get("reason")
+            
+            print(f"Bewertung: {rating}")
+            print(f"Begründung: {reason}")
+            return rating, reason
+        else:
+            print("Keine function_call in der Antwort!")
+            return "Error"
+
+
+    
+
+    async def logic(self):
+        config = await self.load_config()
+        user_messages = []
+        logic_memory = []
+        logic_rating = 0
+        max_attempts = 2
+        ratings = []
+
+        user_messages.append( self.user_message())
+
+        print("Process Rückfrage: ")
+        await self.workflow(user_messages, config["system_prompts"]["Rückfrage"], [])
+
+        user_messages.append( self.user_message())
+
+        print("Process Faktenzusammentragung: ")
+        logic_memory.extend(await self.workflow(user_messages, config["system_prompts"]["Fakten"], logic_memory[-5:]))
+
+        for attempt in range(max_attempts):
+            if logic_rating > 8:
+                break
+            print("Process Skizierug: ")
+            logic_memory.extend(await self.workflow(user_messages, config["system_prompts"]["Skizze"], logic_memory[-5:]))
+            print("Process Kantenbearbeitung: ")
+            logic_memory.extend(await self.workflow(user_messages, config["system_prompts"]["Kanten"], logic_memory[-5:]))
+            print("Process Bewertung: ")
+            logic_rating, reason = await self.rating(await self.load_image(), config["system_prompts"]["Logik_Bewertung"], user_messages, ratings)
+            logic_memory.append({
+                "role": "assistant",
+                "content": f"Bewertung: {str(reason)}"
+            })
+            ratings.append({
+                "role": "assistant",
+                "content": f"Rating:{str(logic_rating)} Begründung: {str(reason)}"
+            })
+            
+        return [logic_memory[-3]], user_messages[:2]
+    
+    async def layout(self, user_messages):
+        config = await self.load_config()
+        layout_memory = []
+        max_attempts = 2
+        layout_rating = 0
+        ratings = []
+        print("/n Layout ------------------------------------------------------------------------------------ /n")
+        for attempt in range(max_attempts):
+            if layout_rating > 8:
+                break
+            print("Process Knoten: ")
+            layout_memory.extend(await self.workflow(user_messages, config["system_prompts"]["Layout_Nodes"], layout_memory[-5:]))
+            print("Process Kanten: ")
+            layout_memory.extend(await self.workflow(user_messages, config["system_prompts"]["Layout_Pfeile"], layout_memory[-5:]))
+            print("Process Schrift: ")
+            layout_memory.extend(await self.workflow(user_messages, config["system_prompts"]["Layout_Schrift"], layout_memory[-5:]))
+            print("Process Bewertung: ")
+            rating, reason = await self.rating(await self.load_image(), config["system_prompts"]["Layout_Bewertung"], user_messages, ratings)
+            layout_memory.append({
+                "role": "assistant",
+                "content": f"Bewertung: {str(reason)}"
+            })
+            ratings.append({
+                "role": "assistant",
+                "content": f"Rating:{str(rating)} Begründung: {str(reason)}"
+            })
+
+    async def main(self):
+        logic, user_messages = await self.logic()
+        prompt = {
+            "role": "user",
+            "content": [{"type": "text","text": f"Code:  {logic[0]["function_call"]["arguments"]}" }]}
+        user_messages.append(prompt)
+        await self.layout(user_messages)
 
 if __name__ == "__main__":
     llm = DiagramLLM()
-    asyncio.run(llm.main_loop())
+    asyncio.run(llm.main())
 
     
